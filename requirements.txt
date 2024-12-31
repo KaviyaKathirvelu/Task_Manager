@@ -1,0 +1,4 @@
+Flask
+Flask-SQLAlchemy  # Optional: For database integration
+requests          # Optional: For calling external APIs
+flask_sqlalchemy

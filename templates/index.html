@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .form-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .form-group input, .form-group select {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .form-group button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .form-group button:hover {
+            background-color: #0056b3;
+        }
+
+        .task {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f9f9f9;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .task.completed {
+            text-decoration: line-through;
+            background: #e8f5e9;
+        }
+
+        .task button {
+            margin-left: 10px;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .task .edit {
+            background-color: #ffc107;
+            color: #fff;
+        }
+
+        .task .delete {
+            background-color: #dc3545;
+            color: #fff;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .pagination button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .pagination button:disabled {
+            background-color: #ddd;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Task Manager</h1>
+
+        <!-- Add Task Form -->
+        <div class="form-group">
+            <input type="text" id="taskName" placeholder="Task Name">
+            <input type="date" id="dueDate">
+            <select id="priority">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+            </select>
+            <button id="addTask">Add Task</button>
+        </div>
+
+        <!-- Search Bar with Search Button -->
+        <div class="form-group">
+            <input type="text" id="search" placeholder="Search tasks...">
+            <button id="searchButton">Search</button>
+        </div>
+
+        <!-- Task List -->
+        <div id="taskList"></div>
+
+        <!-- Pagination -->
+        <div class="pagination">
+            <button id="prevPage" disabled>Previous</button>
+            <button id="nextPage">Next</button>
+        </div>
+    </div>
+
+    <script>
+        const taskList = document.getElementById('taskList');
+        const prevPage = document.getElementById('prevPage');
+        const nextPage = document.getElementById('nextPage');
+        const searchInput = document.getElementById('search');
+        const searchButton = document.getElementById('searchButton');
+
+        let currentPage = 1;
+        const tasksPerPage = 5;
+
+        // Fetch and display tasks
+        function fetchTasks(query = '') {
+            fetch(`/tasks?page=${currentPage}&per_page=${tasksPerPage}&query=${query}`)
+                .then(response => response.json())
+                .then(data => {
+                    displayTasks(data);
+                    prevPage.disabled = currentPage === 1;
+                    nextPage.disabled = data.length < tasksPerPage;
+                });
+        }
+
+        // Display tasks in the UI
+        function displayTasks(tasks) {
+            taskList.innerHTML = '';
+            tasks.forEach(task => {
+                const taskDiv = document.createElement('div');
+                taskDiv.className = `task ${task.completed ? 'completed' : ''}`;
+                taskDiv.innerHTML = `
+                    <span>${task.name} (Due: ${task.due_date}) - Priority: ${task.priority}</span>
+                    <div>
+                        <button class="edit" onclick="editTask(${task.id})">Edit</button>
+                        <button class="delete" onclick="deleteTask(${task.id})">Delete</button>
+                        <button onclick="toggleComplete(${task.id})">${task.completed ? 'Undo' : 'Complete'}</button>
+                    </div>
+                `;
+                taskList.appendChild(taskDiv);
+            });
+        }
+
+        // Add task
+        document.getElementById('addTask').addEventListener('click', () => {
+            const taskName = document.getElementById('taskName').value;
+            const dueDate = document.getElementById('dueDate').value;
+            const priority = document.getElementById('priority').value;
+
+            fetch('/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_name: taskName, due_date: dueDate, priority })
+            }).then(() => {
+                fetchTasks();
+            });
+        });
+
+        // Edit task
+        function editTask(taskId) {
+            const newName = prompt('Enter new task name:');
+            const newDate = prompt('Enter new due date (YYYY-MM-DD):');
+            const newPriority = prompt('Enter new priority (Low, Medium, High):');
+
+            fetch(`/update/${taskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_name: newName, due_date: newDate, priority: newPriority })
+            }).then(() => {
+                fetchTasks();
+            });
+        }
+
+        // Delete task
+        function deleteTask(taskId) {
+            fetch(`/delete/${taskId}`, { method: 'DELETE' })
+                .then(() => {
+                    fetchTasks();
+                });
+        }
+
+        // Toggle task completion
+        function toggleComplete(taskId) {
+            fetch(`/complete/${taskId}`, { method: 'PATCH' })
+                .then(() => {
+                    fetchTasks();
+                });
+        }
+
+        // Search tasks on button click
+        searchButton.addEventListener('click', () => {
+            fetchTasks(searchInput.value);
+        });
+
+        // Pagination
+        prevPage.addEventListener('click', () => {
+            currentPage--;
+            fetchTasks();
+        });
+
+        nextPage.addEventListener('click', () => {
+            currentPage++;
+            fetchTasks();
+        });
+
+        // Initial fetch
+        fetchTasks();
+    </script>
+</body>
+</html>
